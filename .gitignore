@@ -1,0 +1,71 @@
+# =====================================
+# Compiled Executables
+# =====================================
+
+server/server
+client/client
+load_generator/generator
+
+*.out
+*.exe
+*.o
+*.obj
+*.so
+*.dll
+*.a
+
+# =====================================
+# Build Directories
+# =====================================
+
+build/
+bin/
+
+# =====================================
+# VS Code
+# =====================================
+
+.vscode/
+
+# If you want to keep shared settings,
+# remove the line above and use:
+
+# .vscode/*
+# !.vscode/settings.json
+# !.vscode/extensions.json
+
+# =====================================
+# CMake
+# =====================================
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# =====================================
+# Logs
+# =====================================
+
+*.log
+
+# =====================================
+# Runtime Data
+# =====================================
+
+results/*.csv
+results/*.txt
+
+# =====================================
+# Linux
+# =====================================
+
+*~
+.cache/
+
+# =====================================
+# OS Files
+# =====================================
+
+.DS_Store
+Thumbs.db
