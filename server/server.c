@@ -7,9 +7,132 @@
 #include <arpa/inet.h>  // inet_ntoa(), htons()
 #include <sys/socket.h> // socket(), bind(), listen(), accept()
 #include <netinet/in.h> // sockaddr_in
+#include <pthread.h>
+
+
+#define MAX_CLIENTS 100
+
+/*
+ * Stores all active client sockets.
+ */
+int clients[MAX_CLIENTS];
+
+/*
+ * Number of currently connected clients.
+ */
+int client_count = 0;
+
+pthread_mutex_t clients_mutex =
+    PTHREAD_MUTEX_INITIALIZER;
+
+/*
+ * Thread function.
+ *
+ * Every connected client gets its own thread.
+ */
+void broadcast_message(
+    char* message,
+    int sender_fd){
+    pthread_mutex_lock(
+        &clients_mutex
+    );
+
+    for(int i = 0;
+        i < client_count;
+        i++)
+    {
+        if(clients[i] != sender_fd)
+        {
+            send(
+                clients[i],
+                message,
+                strlen(message),
+                0
+            );
+        }
+    }
+
+    pthread_mutex_unlock(
+        &clients_mutex
+    );
+}
+
+
+void* handle_client(void* arg)
+{
+    /*
+     * Retrieve client socket from argument.
+     */
+    int client_fd = *((int*)arg);
+    free(arg);
+
+    char buffer[1024];
+
+    while (1)
+    {
+        memset(buffer, 0, sizeof(buffer));
+
+        int bytes_received =
+            recv(client_fd,
+                 buffer,
+                 sizeof(buffer) - 1,
+                 0);
+
+        if (bytes_received == 0)
+        {
+            printf("\nClient disconnected.\n");
+            break;
+        }
+
+        if (bytes_received < 0)
+        {
+            perror("recv");
+            break;
+        }
+
+        buffer[bytes_received] = '\0';
+
+        printf("\nMessage received:\n");
+        printf("%s\n", buffer);
+
+        broadcast_message(
+            buffer,
+            client_fd
+        );
+
+        printf("Response sent.\n");
+    }
+    pthread_mutex_lock(
+        &clients_mutex
+    );
+
+    for(int i = 0;
+        i < client_count;
+        i++)
+    {
+        if(clients[i] ==
+        client_fd)
+        {
+            clients[i] =
+                clients[client_count - 1];
+
+            client_count--;
+
+            break;
+        }
+    }
+    pthread_mutex_unlock(
+        &clients_mutex
+    );
+
+    close(client_fd);
+
+    return NULL;
+}
 
 int main()
 {
+    
     // Server socket file descriptor
     // Think of this as a handle to our listening endpoint
     int server_fd;
@@ -95,47 +218,78 @@ int main()
     printf("Listening on port 8080...\n");
     printf("Waiting for incoming connection...\n");
 
-    /*
-     * Information about the connecting client
-     */
-    struct sockaddr_in client_addr;
-
-    socklen_t client_len = sizeof(client_addr);
-
-    /*
-     * accept() blocks until a client connects
-     *
-     * Important:
-     *
-     * server_fd remains the listening socket
-     *
-     * accept() creates a NEW socket
-     * dedicated to the connected client.
-     */
-    int client_fd =
-        accept(server_fd,
-               (struct sockaddr *)&client_addr,
-               &client_len);
-
-    if (client_fd < 0)
+    while (1)
     {
-        perror("accept");
-        close(server_fd);
-        return 1;
+        /*
+        * Information about the connecting client
+        */
+        struct sockaddr_in client_addr;
+
+        socklen_t client_len = sizeof(client_addr);
+
+        /*
+        * accept() blocks until a client connects
+        *
+        * Important:
+        *
+        * server_fd remains the listening socket
+        *
+        * accept() creates a NEW socket
+        * dedicated to the connected client.
+        */
+        int client_fd =
+            accept(server_fd,
+                (struct sockaddr *)&client_addr,
+                &client_len);
+
+        if (client_fd < 0)
+        {
+            perror("accept");
+            close(server_fd);
+            return 1;
+        }
+
+        /*
+        * Print client IP address
+        */
+        printf("\nClient connected!\n");
+        printf("Client IP: %s\n",
+            inet_ntoa(client_addr.sin_addr));
+        pthread_mutex_lock(
+            &clients_mutex
+        );
+
+        clients[client_count] =
+            client_fd;
+
+        client_count++;
+
+        pthread_mutex_unlock(
+            &clients_mutex
+        );
+
+        printf(
+            "Total clients: %d\n",
+            client_count
+        );
+            
+        pthread_t tid;
+
+        int* client_socket =
+            malloc(sizeof(int));
+
+        *client_socket = client_fd;
+
+        pthread_create(
+            &tid,
+            NULL,
+            handle_client,
+            client_socket
+        );
+    
+        pthread_detach(tid);
     }
-
-    /*
-     * Print client IP address
-     */
-    printf("\nClient connected!\n");
-    printf("Client IP: %s\n",
-           inet_ntoa(client_addr.sin_addr));
-
-    /*
-     * Close client connection
-     */
-    close(client_fd);
-
+    
     /*
      * Close listening socket
      */
