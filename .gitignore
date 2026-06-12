@@ -5,7 +5,7 @@
 server/server
 client/client
 load_generator/generator
-
+*.csv
 *.out
 *.exe
 *.o

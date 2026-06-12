@@ -10,7 +10,7 @@
 #include <pthread.h>
 
 
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 5000
 
 /*
  * Stores all active client sockets.
